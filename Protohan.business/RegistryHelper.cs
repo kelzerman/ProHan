@@ -1,6 +1,5 @@
 ﻿using Microsoft.Win32;
 using Protohan.Domain.Interfaces;
-using Protohan.Domain.Models;
 using System;
 using System.IO;
 
@@ -8,39 +7,33 @@ namespace Protohan.Business
 {
     public class RegistryHelper : IRegistryHelper
     {
-        public ProtocolResult Create(string protocol, string pathToExecutable)
+        private readonly ILogger logger;
+
+        public RegistryHelper(ILogger logger)
+        {
+            this.logger = logger;
+        }
+
+        public void Create(string protocol, string pathToExecutable)
         {
             if (string.IsNullOrEmpty(protocol))
-            {
-                return new ProtocolResult
-                {
-                    Message = "Protocol cannot be empty!",
-                    Succes = false
-                };
-            }
+                logger.Error("Protocol cannot be empty!");
 
             if (string.IsNullOrEmpty(pathToExecutable) || !File.Exists(pathToExecutable))
-            {
-                return new ProtocolResult
-                {
-                    Message = "Executable not found.",
-                    Succes = false
-                };
-            }
+                logger.Error("Executable not found or incorrect.");
 
             RegisterProtocol(protocol, pathToExecutable);
 
-            return new ProtocolResult
-            {
-                Message = $"Protocol {protocol} registered in the system.",
-                Succes = true
-            };
+            logger.Write($"Protocol {protocol} registered in the system.");
         }
 
         public void Delete(string protocol)
         {
             if (!Exists(protocol))
+            {
+                logger.Error($"Protocol {protocol} not found on system.");
                 return;
+            }
 
             var key = Registry.CurrentUser.CreateSubKey("SOFTWARE\\Classes\\");
 
@@ -49,11 +42,13 @@ namespace Protohan.Business
             key.DeleteSubKey(protocol + "\\Shell\\open");
             key.DeleteSubKey(protocol + "\\Shell");
             key.DeleteSubKey(protocol);
+
+            logger.Write($"Protocol {protocol} deleted from system.");
         }
 
-        public bool Exists(string key)
+        public bool Exists(string protocol)
         {
-            return Registry.CurrentUser.OpenSubKey(@"SOFTWARE\\Classes\\" + key, true) != null;
+            return Registry.CurrentUser.OpenSubKey(@"SOFTWARE\\Classes\\" + protocol, true) != null;
         }
 
         public string GetExecutablePath(string procotol)
@@ -68,7 +63,7 @@ namespace Protohan.Business
         {
             using (var key = Registry.CurrentUser.CreateSubKey("SOFTWARE\\Classes\\" + protocol))
             {
-                string applicationLocation = Path.Combine(Environment.CurrentDirectory, "LonHandler.exe");
+                string applicationLocation = Path.Combine(Environment.CurrentDirectory, "ProtoHan.exe");
 
                 key.SetValue("", "URL:" + protocol);
                 key.SetValue("URL Protocol", "");

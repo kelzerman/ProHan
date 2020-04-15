@@ -14,21 +14,23 @@ namespace Protohan
         private static List<string> options = new List<string> { "-register", "-unregister" };
 
         private static IRegistryHelper registeryHelper { get; set; }
+        private static ILogger logger { get; set; }
 
         static void Main(string[] args)
         {
             Initialize();
 
+            logger.Write("ProtoHan started.");
+            logger.Write(" ");
             if (args.Length > 0)
             {
                 if (options.Contains(args[0]))
                 {
                     if (args[0] == "-register")
-                        HandleRegistrations(args[1], args[2]);
+                        RegisterProtocol(args[1], args[2]);
 
                     if (args[0] == "-unregister")
-                        if (registeryHelper.Exists(args[1]))
-                            registeryHelper.Delete(args[1]);
+                        registeryHelper.Delete(args[1]);
                 }
                 else
                     LoadProtocol(args[0]);
@@ -40,6 +42,7 @@ namespace Protohan
         private static void LoadProtocol(string uri)
         {
             uri = HttpUtility.UrlDecode(uri);
+            logger.Write($"Loading protocol for URI {uri}.");
 
             try
             {
@@ -47,58 +50,46 @@ namespace Protohan
 
                 var protocol = segments[0];
                 var path = uri.Replace(protocol + @":\\", string.Empty);
-
-                WriteLog("Protocol: " + protocol);
-                WriteLog("Path: " + path);
-
                 var appPath = registeryHelper.GetExecutablePath(protocol);
+
+                if (appPath == null || string.IsNullOrEmpty(appPath))
+                    logger.Write($"No application found for this protocol {protocol}");
+
                 RunApplication(appPath, path);
 
             }
             catch (Exception ex)
             {
-                WriteLog(ex.Message);
+                logger.Write(ex);
             }
         }
 
-        private static void HandleRegistrations(string protocol, string executable)
+        private static void RegisterProtocol(string protocol, string executable)
         {
+            logger.Write($"Registering protocol {protocol} with application {executable}.");
+
             if (registeryHelper.Exists(protocol))
+            {
+                logger.Write("Protocol found; deleting it first.");
                 registeryHelper.Delete(protocol);
+            }
 
-            var result = registeryHelper.Create(protocol, executable);
-
-            WriteLog(result.Message);
+           registeryHelper.Create(protocol, executable);
         }
 
         private static void ShowOptions()
         {
-            Console.WriteLine("Usage: LONHandler [options]");
-            Console.WriteLine(@"Example: LONHandler -register mymedia c:\path_to\application_to_run.exe");
             Console.WriteLine("");
-            Console.WriteLine("Usage: LONHandler [protocol-uri]");
-            Console.WriteLine(@"Example: LONHandler mymedia:\\some_uri_here");
+            Console.WriteLine("Usage: ProtoHan [options]");
+            Console.WriteLine(@"Example: ProtoHan -register mymedia c:\path_to\application_to_run.exe");
+            Console.WriteLine("");
+            Console.WriteLine("Usage: ProtoHan [protocol-uri]");
+            Console.WriteLine(@"Example: ProtoHan mymedia:\\some_uri_here");
 
             Console.WriteLine("");
             Console.WriteLine("Options:");
             PrintRow("-register <protocol> <path_to_executable>", "Register a new protocol handled by an executable");
             PrintRow("-unregister <protocol> <path_to_executable>", "Removes a register a new protocol handled by an executable");
-        }
-
-        private static void WriteLog(string message)
-        {
-            var debugFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "debug.txt");
-
-            if (File.Exists(debugFile))
-                using (StreamWriter sw = File.CreateText(debugFile))
-                {
-                    sw.WriteLine(message);
-                }
-            else
-                using (StreamWriter sw = File.AppendText(debugFile))
-                {
-                    sw.WriteLine(message);
-                }
         }
 
         private static void PrintRow(params string[] columns)
@@ -108,11 +99,16 @@ namespace Protohan
 
             foreach (string column in columns)
                 row += column.PadRight(width);
+
+            Console.WriteLine(row);
         }
 
         private static void RunApplication(string appPath, string path)
         {
             var commandToRun = "\"" + appPath + "\" " + "\"" + path + "\"";
+
+            logger.Write("Running application with command: ");
+            logger.Write($"\t{commandToRun}");
 
             Process p = new Process();
             p.StartInfo.FileName = "cmd.exe";
@@ -131,9 +127,12 @@ namespace Protohan
         {
             var serviceProvider = new ServiceCollection()
                 .AddSingleton<IRegistryHelper, RegistryHelper>()
+                .AddSingleton<ILogger, ConsoleLogger>() // Will log to the console window.
+                                                        //.AddSingleton<ILogger, FileLogger>() // Will log to a debug file, located in the AppData folder.
                 .BuildServiceProvider();
 
             registeryHelper = serviceProvider.GetService<IRegistryHelper>();
+            logger = serviceProvider.GetService<ILogger>();
         }
     }
 }
