@@ -1,0 +1,12 @@
+﻿################################################################################
+# This .gitignore file was automatically created by Microsoft(R) Visual Studio.
+################################################################################
+
+/.vs
+/Protohan/bin/Debug/netcoreapp3.1
+/Protohan/obj
+/Protohan.business/bin/Debug/netcoreapp3.1
+/Protohan.business/obj
+/Protohan.Domain/bin/Debug/netcoreapp3.1
+/Protohan.Domain/obj/Debug/netcoreapp3.1
+/Protohan.Domain/obj
