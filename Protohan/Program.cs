@@ -4,7 +4,6 @@ using Protohan.Domain.Interfaces;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
 using System.Web;
 
 namespace Protohan
@@ -22,6 +21,7 @@ namespace Protohan
 
             logger.Write("ProtoHan started.");
             logger.Write(" ");
+
             if (args.Length > 0)
             {
                 if (options.Contains(args[0]))
@@ -127,8 +127,8 @@ namespace Protohan
         {
             var serviceProvider = new ServiceCollection()
                 .AddSingleton<IRegistryHelper, RegistryHelper>()
-                .AddSingleton<ILogger, ConsoleLogger>() // Will log to the console window.
-                                                        //.AddSingleton<ILogger, FileLogger>() // Will log to a debug file, located in the AppData folder.
+                //.AddSingleton<ILogger, ConsoleLogger>() // Will log to the console window.
+                .AddSingleton<ILogger, FileLogger>() // Will log to a debug file, located in the AppData folder.
                 .BuildServiceProvider();
 
             registeryHelper = serviceProvider.GetService<IRegistryHelper>();
