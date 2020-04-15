@@ -1,2 +1,2 @@
 # Protohan
-Registering and executing custom protocols
+Registering and executing custom protocolses
