@@ -1,9 +1,8 @@
-﻿using Microsoft.Extensions.DependencyInjection;
-using Protohan.Business;
-using Protohan.Domain.Interfaces;
+﻿using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Web;
 
 namespace Protohan
@@ -12,25 +11,20 @@ namespace Protohan
     {
         private static List<string> options = new List<string> { "-register", "-unregister" };
 
-        private static IRegistryHelper registeryHelper { get; set; }
-        private static ILogger logger { get; set; }
-
         static void Main(string[] args)
         {
-            Initialize();
-
-            logger.Write("ProtoHan started.");
-            logger.Write(" ");
+            Console.WriteLine("ProtoHan started.");
+            Console.WriteLine(" ");
 
             if (args.Length > 0)
             {
                 if (options.Contains(args[0]))
                 {
                     if (args[0] == "-register")
-                        RegisterProtocol(args[1], args[2]);
+                        Create(args[1], args[2]);
 
                     if (args[0] == "-unregister")
-                        registeryHelper.Delete(args[1]);
+                        Delete(args[1]);
                 }
                 else
                     LoadProtocol(args[0]);
@@ -42,7 +36,7 @@ namespace Protohan
         private static void LoadProtocol(string uri)
         {
             uri = HttpUtility.UrlDecode(uri);
-            logger.Write($"Loading protocol for URI {uri}.");
+            Console.WriteLine($"Loading protocol for URI {uri}.");
 
             try
             {
@@ -50,36 +44,22 @@ namespace Protohan
 
                 var protocol = segments[0];
                 var path = uri.Replace(protocol + @":\\", string.Empty);
-                var appPath = registeryHelper.GetExecutablePath(protocol);
+                var appPath = GetExecutablePath(protocol);
 
                 if (appPath == null || string.IsNullOrEmpty(appPath))
-                    logger.Write($"No application found for this protocol {protocol}");
+                    Console.WriteLine($"No application found for this protocol {protocol}");
 
                 RunApplication(appPath, path);
 
             }
             catch (Exception ex)
             {
-                logger.Write(ex);
+                Console.WriteLine(ex);
             }
-        }
-
-        private static void RegisterProtocol(string protocol, string executable)
-        {
-            logger.Write($"Registering protocol {protocol} with application {executable}.");
-
-            if (registeryHelper.Exists(protocol))
-            {
-                logger.Write("Protocol found; deleting it first.");
-                registeryHelper.Delete(protocol);
-            }
-
-           registeryHelper.Create(protocol, executable);
         }
 
         private static void ShowOptions()
         {
-            Console.WriteLine("");
             Console.WriteLine("Usage: ProtoHan [options]");
             Console.WriteLine(@"Example: ProtoHan -register mymedia c:\path_to\application_to_run.exe");
             Console.WriteLine("");
@@ -107,8 +87,8 @@ namespace Protohan
         {
             var commandToRun = "\"" + appPath + "\" " + "\"" + path + "\"";
 
-            logger.Write("Running application with command: ");
-            logger.Write($"\t{commandToRun}");
+            Console.WriteLine("Running application with command: ");
+            Console.WriteLine($"\t{commandToRun}");
 
             Process p = new Process();
             p.StartInfo.FileName = "cmd.exe";
@@ -123,16 +103,87 @@ namespace Protohan
             p.StandardInput.Close();
         }
 
-        private static void Initialize()
+        private static void Create(string protocol, string pathToExecutable)
         {
-            var serviceProvider = new ServiceCollection()
-                .AddSingleton<IRegistryHelper, RegistryHelper>()
-                //.AddSingleton<ILogger, ConsoleLogger>() // Will log to the console window.
-                .AddSingleton<ILogger, FileLogger>() // Will log to a debug file, located in the AppData folder.
-                .BuildServiceProvider();
+            Console.WriteLine($"Registering protocol {protocol} with application {pathToExecutable}.");
 
-            registeryHelper = serviceProvider.GetService<IRegistryHelper>();
-            logger = serviceProvider.GetService<ILogger>();
+            if (string.IsNullOrEmpty(protocol))
+                WriteError("Protocol cannot be empty!");
+
+            if (string.IsNullOrEmpty(pathToExecutable) || !File.Exists(pathToExecutable))
+                WriteError("Executable not found or incorrect.");
+
+            if (Exists(protocol))
+            {
+                Console.WriteLine("Protocol found; deleting it first.");
+                Delete(protocol);
+            }
+
+            AddProtocolToRegistry(protocol, pathToExecutable);
+
+            Console.WriteLine($"Protocol {protocol} registered in the system.");
+        }
+
+        private static void Delete(string protocol)
+        {
+            if (!Exists(protocol))
+            {
+                WriteError($"Protocol {protocol} not found on system.");
+                return;
+            }
+
+            var key = Registry.CurrentUser.CreateSubKey("SOFTWARE\\Classes\\");
+
+            key.DeleteSubKey(protocol + "\\DefaultIcon");
+            key.DeleteSubKey(protocol + "\\Shell\\open\\command");
+            key.DeleteSubKey(protocol + "\\Shell\\open");
+            key.DeleteSubKey(protocol + "\\Shell");
+            key.DeleteSubKey(protocol);
+
+            Console.WriteLine($"Protocol {protocol} deleted from system.");
+        }
+
+        private static bool Exists(string protocol)
+        {
+            return Registry.CurrentUser.OpenSubKey(@"SOFTWARE\\Classes\\" + protocol, true) != null;
+        }
+
+        private static string GetExecutablePath(string procotol)
+        {
+            var regKey = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\\Classes\\" + procotol, true);
+            var path = regKey.GetValue("Executable");
+
+            return path.ToString();
+        }
+
+        private static void WriteError(string message)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine(message);
+            Console.ForegroundColor = ConsoleColor.White;
+        }
+
+        private static void AddProtocolToRegistry(string protocol, string pathToExecutable)
+        {
+            using (var key = Registry.CurrentUser.CreateSubKey("SOFTWARE\\Classes\\" + protocol))
+            {
+                string applicationLocation = Path.Combine(Environment.CurrentDirectory, "ProtoHan.exe");
+
+                key.SetValue("", "URL:" + protocol);
+                key.SetValue("URL Protocol", "");
+
+                using (var defaultIcon = key.CreateSubKey("DefaultIcon"))
+                {
+                    defaultIcon.SetValue("", applicationLocation + ",1");
+                }
+
+                key.SetValue("Executable", pathToExecutable);
+
+                using (var commandKey = key.CreateSubKey(@"shell\open\command"))
+                {
+                    commandKey.SetValue("", "\"" + applicationLocation + "\" \"%1\"");
+                }
+            }
         }
     }
 }

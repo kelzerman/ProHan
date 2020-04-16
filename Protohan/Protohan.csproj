@@ -10,9 +10,4 @@
     <PackageReference Include="Microsoft.Win32.Registry" Version="4.7.0" />
   </ItemGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\Protohan.business\Protohan.Business.csproj" />
-    <ProjectReference Include="..\Protohan.Domain\Protohan.Domain.csproj" />
-  </ItemGroup>
-
 </Project>
