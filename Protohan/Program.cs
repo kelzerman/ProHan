@@ -46,15 +46,17 @@ namespace Protohan
                 var path = uri.Replace(protocol + @":\\", string.Empty);
                 var appPath = GetExecutablePath(protocol);
 
-                if (appPath == null || string.IsNullOrEmpty(appPath))
-                    Console.WriteLine($"No application found for this protocol {protocol}");
+                if (appPath == null || string.IsNullOrEmpty(appPath)){
+                    WriteError($"No application found for this protocol {protocol}");
+                    return;
+                }
 
                 RunApplication(appPath, path);
 
             }
             catch (Exception ex)
             {
-                Console.WriteLine(ex);
+                WriteError(ex);
             }
         }
 
@@ -107,11 +109,15 @@ namespace Protohan
         {
             Console.WriteLine($"Registering protocol {protocol} with application {pathToExecutable}.");
 
-            if (string.IsNullOrEmpty(protocol))
+            if (string.IsNullOrEmpty(protocol)){
                 WriteError("Protocol cannot be empty!");
+                return;
+            }
 
-            if (string.IsNullOrEmpty(pathToExecutable) || !File.Exists(pathToExecutable))
+            if (string.IsNullOrEmpty(pathToExecutable) || !File.Exists(pathToExecutable)){
                 WriteError("Executable not found or incorrect.");
+                return;
+            }
 
             if (Exists(protocol))
             {
@@ -160,6 +166,17 @@ namespace Protohan
         {
             Console.ForegroundColor = ConsoleColor.Red;
             Console.WriteLine(message);
+            Console.ForegroundColor = ConsoleColor.White;
+        }
+
+        private static void WriteError(Exception ex)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine(ex.Message);
+
+            if (ex.InnerException != null)
+                WriteError(ex.InnerException);
+
             Console.ForegroundColor = ConsoleColor.White;
         }
 
